@@ -8,6 +8,7 @@ import (
 
 	"github.com/containerd/cgroups/v3"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/pmarchini/giogo/ft"
 )
 
 // Core struct holds the resources and the CgroupManager
@@ -48,6 +49,9 @@ func NewCore(resources specs.LinuxResources) (*Core, error) {
 	if cgroupMode == cgroups.Unified {
 		manager, err = NewCgroupV2Manager(cgroupPath, resources)
 	} else {
+		if !ft.CheckFeature("FT_CGROUP_V1_SUPPORT") {
+			return nil, fmt.Errorf("cgroup v1 is not supported")
+		}
 		manager, err = NewCgroupV1Manager(cgroupPath, resources)
 	}
 	if err != nil {
