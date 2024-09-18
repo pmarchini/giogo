@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 
 	"github.com/containerd/cgroups/v3"
 	specs "github.com/opencontainers/runtime-spec/specs-go"
@@ -15,10 +16,28 @@ type Core struct {
 	CgroupManager CgroupManager
 }
 
+func IsValidSystemdSlice(path string) bool {
+	regexPattern := `^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$`
+
+	// Compile the regex
+	regex := regexp.MustCompile(regexPattern)
+
+	// Check if the path matches the regex
+	return regex.MatchString(path)
+}
+
+func GenerateCgroupPath() string {
+	cgroupSystemdSlice := fmt.Sprintf("giogo-cgroup-%d", os.Getpid())
+	if !IsValidSystemdSlice(cgroupSystemdSlice) {
+		panic("Invalid systemd slice path")
+	}
+	return cgroupSystemdSlice
+}
+
 // NewCore returns a new Core instance and initializes the appropriate CgroupManager based on the cgroup version
 func NewCore(resources specs.LinuxResources) (*Core, error) {
 	cgroupMode := cgroups.Mode()
-	cgroupPath := fmt.Sprintf("/giogo_cgroup_%d", os.Getpid())
+	cgroupPath := GenerateCgroupPath()
 
 	fmt.Printf("Creating core for groupPath %s\n", cgroupPath)
 

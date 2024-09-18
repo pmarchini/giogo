@@ -37,6 +37,11 @@ func TestRunCommand(t *testing.T) {
 	mockManager.AssertCalled(t, "Delete")
 }
 
+func TestGenerateCgroupPath(t *testing.T) {
+	path := core.GenerateCgroupPath()
+	assert.Contains(t, path, "giogo-cgroup-")
+}
+
 // TestRunCommand_AddProcessError tests when adding a process to the cgroup fails
 func TestRunCommand_AddProcessError(t *testing.T) {
 	mockManager := new(core.MockCgroupManager)
