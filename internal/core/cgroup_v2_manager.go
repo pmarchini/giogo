@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/containerd/cgroups/v3/cgroup2"
@@ -14,7 +15,7 @@ type CgroupV2Manager struct {
 
 // NewCgroupV2Manager creates a new CgroupV2Manager
 func NewCgroupV2Manager(path string, resources specs.LinuxResources) (CgroupManager, error) {
-	log.Printf("Creating cgroup v2 manager for path %s", path)
+	fmt.Printf("Creating cgroup v2 manager for path %s", path)
 	manager, err := cgroup2.NewSystemd("/", path, -1, cgroup2.ToResources(&resources))
 	if err != nil {
 		log.Printf("Error creating cgroup v2 manager: %v", err)
