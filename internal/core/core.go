@@ -18,7 +18,7 @@ type Core struct {
 // NewCore returns a new Core instance and initializes the appropriate CgroupManager based on the cgroup version
 func NewCore(resources specs.LinuxResources) (*Core, error) {
 	cgroupMode := cgroups.Mode()
-	cgroupPath := fmt.Sprintf("/giogo_cgroup_%d", os.Getpid())
+	cgroupPath := fmt.Sprintln("/giogo_cgroup_%d", os.Getpid())
 
 	var manager CgroupManager
 	var err error
