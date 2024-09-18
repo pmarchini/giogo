@@ -12,11 +12,6 @@ Giogo is a command-line tool that allows you to run processes with specified res
   - [Memory Limitations](#memory-limitations)
   - [IO Limitations](#io-limitations)
 - [Examples](#examples)
-- [Behavior-Driven Development (BDD) Testing](#behavior-driven-development-bdd-testing)
-- [Permissions](#permissions)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
 
 ## Features
 
