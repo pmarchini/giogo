@@ -3,6 +3,7 @@ package limiter
 import (
 	"fmt"
 	"io/ioutil"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -96,7 +97,6 @@ func GetBlockDevices(blockDir string) ([]BlockDevice, error) {
 
 func (i *IOLimiter) Apply(resources *specs.LinuxResources) {
 	// Set the throttle values for read and write operations
-	// create []specs.LinuxThrottleDevice
 	var linuxThrottleDevices []specs.LinuxThrottleDevice
 	for _, device := range i.BlockDevices {
 		linuxThrottleDevices = append(
@@ -110,9 +110,12 @@ func (i *IOLimiter) Apply(resources *specs.LinuxResources) {
 			},
 		)
 	}
-	resources.BlockIO = &specs.LinuxBlockIO{
-		ThrottleReadBpsDevice:  linuxThrottleDevices,
-		ThrottleWriteBpsDevice: linuxThrottleDevices,
+	resources.BlockIO = &specs.LinuxBlockIO{}
+	if i.ReadThrottle != math.MaxUint64 {
+		resources.BlockIO.ThrottleReadBpsDevice = linuxThrottleDevices
+	}
+	if i.WriteThrottle != math.MaxUint64 {
+		resources.BlockIO.ThrottleWriteBpsDevice = linuxThrottleDevices
 	}
 }
 
@@ -123,6 +126,7 @@ type IOLimiterInitializer struct {
 
 func NewIOLimiter(init *IOLimiterInitializer) (*IOLimiter, error) {
 	var systemBlockDir string
+	var readThrottle, writeThrottle uint64 = math.MaxUint64, math.MaxUint64
 	if init.OverrideSystemBlockDir != "" {
 		systemBlockDir = init.OverrideSystemBlockDir
 	} else {
@@ -133,13 +137,17 @@ func NewIOLimiter(init *IOLimiterInitializer) (*IOLimiter, error) {
 	if err != nil {
 		return nil, &IOLimiterError{Message: "error retrieving block devices", Cause: err}
 	}
-	readThrottle, err := utils.BytesStringToBytes(init.ReadThrottle)
-	if err != nil {
-		return nil, &IOLimiterError{Message: "unparsable ReadThrottle value", Cause: err}
+	if init.ReadThrottle != "-1" {
+		readThrottle, err = utils.BytesStringToBytes(init.ReadThrottle)
+		if err != nil {
+			return nil, &IOLimiterError{Message: "unparsable ReadThrottle value", Cause: err}
+		}
 	}
-	writeThrottle, err := utils.BytesStringToBytes(init.WriteThrottle)
-	if err != nil {
-		return nil, &IOLimiterError{Message: "unparsable WriteThrottle value", Cause: err}
+	if init.WriteThrottle != "-1" {
+		writeThrottle, err = utils.BytesStringToBytes(init.WriteThrottle)
+		if err != nil {
+			return nil, &IOLimiterError{Message: "unparsable WriteThrottle value", Cause: err}
+		}
 	}
 	return &IOLimiter{
 		ReadThrottle:   readThrottle,

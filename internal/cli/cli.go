@@ -26,8 +26,8 @@ func SetupRootCommand(rootCmd *cobra.Command) {
 	// Define flags
 	rootCmd.Flags().StringVar(&ram, "ram", "", "Memory limit (e.g., 128m, 1g)")
 	rootCmd.Flags().StringVar(&cpu, "cpu", "", "CPU limit as a fraction between 0 and 1 (e.g., 0.5)")
-	rootCmd.Flags().StringVar(&ioReadMax, "io-read-max", "", "IO read max bandwidth (e.g., 128k, 1m)")
-	rootCmd.Flags().StringVar(&ioWriteMax, "io-write-max", "", "IO write max bandwidth (e.g., 128k, 1m)")
+	rootCmd.Flags().StringVar(&ioReadMax, "io-read-max", "-1", "IO read max bandwidth (e.g., 128k, 1m)")
+	rootCmd.Flags().StringVar(&ioWriteMax, "io-write-max", "-1", "IO write max bandwidth (e.g., 128k, 1m)")
 }
 
 func Execute() {
@@ -59,7 +59,17 @@ func runCommand(cmd *cobra.Command, args []string) error {
 		limiters = append(limiters, memLimiter)
 	}
 
-	// TODO: Implement IO limiters when ready
+	if ioReadMax != "" || ioWriteMax != "" {
+		ioInit := limiter.IOLimiterInitializer{
+			ReadThrottle:  ioReadMax,
+			WriteThrottle: ioWriteMax,
+		}
+		ioLimiter, err := limiter.NewIOLimiter(&ioInit)
+		if err != nil {
+			return fmt.Errorf("invalid IO value: %v", err)
+		}
+		limiters = append(limiters, ioLimiter)
+	}
 
 	exec := executor.NewExecutor(limiters)
 	if err := exec.RunCommand(args); err != nil {
