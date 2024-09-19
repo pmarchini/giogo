@@ -10,7 +10,7 @@ import (
 func TestNewMemoryLimiter(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected int64
+		expected uint64
 		wantErr  bool
 	}{
 		{"128k", 128 * 1024, false},

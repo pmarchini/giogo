@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func ParseMemory(s string) (int64, error) {
+func BytesStringToBytes(s string) (uint64, error) {
 	s = strings.TrimSpace(s)
 	var multiplier int64 = 1
 	if strings.HasSuffix(s, "g") || strings.HasSuffix(s, "G") {
@@ -24,5 +24,5 @@ func ParseMemory(s string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return int64(value * float64(multiplier)), nil
+	return uint64(value * float64(multiplier)), nil
 }
