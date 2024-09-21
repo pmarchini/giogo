@@ -32,7 +32,7 @@ func main() {
 	MeasureTime("Read File", func() {
 		// Create a 5MB file
 		filePath := filepath.Join(tempDir, "file")
-		if err := ioutil.WriteFile(filePath, make([]byte, 5*1024*1024), 0644); err != nil {
+		if err := os.WriteFile(filePath, make([]byte, 5*1024*1024), 0644); err != nil {
 			fmt.Printf("Failed to create file: %v\n", err)
 			os.Exit(1)
 		}
