@@ -57,7 +57,6 @@ func TestExecuteIOLimits(t *testing.T) {
 	}
 }
 
-// TODO: Test that if IO limits are set, and ram is not, the command limits also ram
 func TestCreateLimiters_IOLimitsAndNoRAM(t *testing.T) {
 	cpu := ""
 	ram := ""
@@ -86,5 +85,67 @@ func TestCreateLimiters_IOLimitsAndNoRAM(t *testing.T) {
 		t.Errorf("expected memory limiter to be included when IO limits are set and RAM is not")
 	} else if memLimiter.Limit != ioWriteMaxBytes {
 		t.Errorf("expected memory limiter to have the same value as ioWriteMax, got %v", memLimiter.Limit)
+	}
+}
+
+func TestCreateLimiters_IOLimitsAndNoRAM_ReadLimit(t *testing.T) {
+	cpu := ""
+	ram := ""
+	ioReadMax := "10m"
+	ioWriteMax := limiter.UnlimitedIOValue
+
+	ioReadMaxBytes, err := utils.BytesStringToBytes(ioReadMax)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	limiters, err := cli.CreateLimiters(cpu, ram, ioReadMax, ioWriteMax)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var memLimiter *limiter.MemoryLimiter
+	for _, l := range limiters {
+		if ml, ok := l.(*limiter.MemoryLimiter); ok {
+			memLimiter = ml
+			break
+		}
+	}
+
+	if memLimiter == nil {
+		t.Errorf("expected memory limiter to be included when IO limits are set and RAM is not")
+	} else if memLimiter.Limit != ioReadMaxBytes {
+		t.Errorf("expected memory limiter to have the same value as ioReadMax, got %v", memLimiter.Limit)
+	}
+}
+
+func TestCreateLimiters_IOLimitsAndRAM(t *testing.T) {
+	cpu := ""
+	ram := "128m"
+	ioReadMax := "10m"
+	ioWriteMax := "20m"
+
+	expectedRam, err := utils.BytesStringToBytes(ram)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	limiters, err := cli.CreateLimiters(cpu, ram, ioReadMax, ioWriteMax)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var memLimiter *limiter.MemoryLimiter
+	for _, l := range limiters {
+		if ml, ok := l.(*limiter.MemoryLimiter); ok {
+			memLimiter = ml
+			break
+		}
+	}
+
+	if memLimiter == nil {
+		t.Errorf("expected memory limiter to be included when user specifies both RAM and IO limits")
+	} else if memLimiter.Limit != expectedRam {
+		t.Errorf("expected memory limiter to be the one provided by the user, got %v", memLimiter.Limit)
 	}
 }

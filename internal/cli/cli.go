@@ -74,7 +74,13 @@ func CreateLimiters(cpu, ram, ioReadMax, ioWriteMax string) ([]limiter.ResourceL
 		// I/O, by default, uses Kernel caching, which means that the I/O is not directly written to the disk, but to the Kernel cache. This cache is then written to the disk in the background. This is done to improve performance, as writing to the disk is much slower than writing to memory.
 		// For this reason we need to limit also the memory in the cgroup if not already done.
 		if ram == "" {
-			memLimiter, err := limiter.NewMemoryLimiter(ioWriteMax)
+			// pick ioWriteMax with fallback to ioReadMax
+			if ioWriteMax != limiter.UnlimitedIOValue {
+				ram = ioWriteMax
+			} else {
+				ram = ioReadMax
+			}
+			memLimiter, err := limiter.NewMemoryLimiter(ram)
 			if err != nil {
 				return nil, fmt.Errorf("invalid RAM value: %v", err)
 			}

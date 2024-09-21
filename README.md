@@ -117,9 +117,7 @@ Giogo supports various flags to set cgroup resource limitations:
   - **Example**: `--io-write-max=512k` limits IO write to 512 KB/s.
 
 **Note:**  
-By default, Giogo sets a bandwidth throttle on every block device's IO. The Linux kernel uses caching by default, which means that `io-write-max` is also set as a RAM limit unless another RAM limit is explicitly declared. If you need to bypass this behavior, set a high value for the RAM limit using the `--ram` flag. 
-
-// TODO: what happens if io write max is not set? rework this
+By default, Giogo sets a bandwidth throttle on every block device's IO. The Linux kernel uses caching by default, which means that `io-write-max`, with fallback on `io-read-max`, is also set as a RAM limit unless another RAM limit is explicitly declared. If you need to bypass this behavior, set a high value for the RAM limit using the `--ram` flag.
 
 **Additional Note:**  
 If your operations utilize the `O_DIRECT` flag, the RAM limit is not required, as `O_DIRECT` bypasses the kernel's caching mechanism.

@@ -34,6 +34,8 @@ func (e *IOLimiterError) Unwrap() error {
 // Parse error
 var IOErrUnparsableValue = &IOLimiterError{Message: "unparsable value", Cause: nil}
 
+var UnlimitedIOValue = "-1"
+
 type IOLimiter struct {
 	// Limit is the maximum number of bytes that can be read or written
 	ReadThrottle, WriteThrottle uint64
@@ -137,13 +139,13 @@ func NewIOLimiter(init *IOLimiterInitializer) (*IOLimiter, error) {
 	if err != nil {
 		return nil, &IOLimiterError{Message: "error retrieving block devices", Cause: err}
 	}
-	if init.ReadThrottle != "-1" {
+	if init.ReadThrottle != UnlimitedIOValue {
 		readThrottle, err = utils.BytesStringToBytes(init.ReadThrottle)
 		if err != nil {
 			return nil, &IOLimiterError{Message: "unparsable ReadThrottle value", Cause: err}
 		}
 	}
-	if init.WriteThrottle != "-1" {
+	if init.WriteThrottle != UnlimitedIOValue {
 		writeThrottle, err = utils.BytesStringToBytes(init.WriteThrottle)
 		if err != nil {
 			return nil, &IOLimiterError{Message: "unparsable WriteThrottle value", Cause: err}
