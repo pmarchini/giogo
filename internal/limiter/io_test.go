@@ -32,7 +32,7 @@ func CreateMockBlockDevicesHelper(t *testing.T, tempDir string, blockDevices []l
 }
 
 func setupMockBlockDevices(t *testing.T, blockDevices []limiter.BlockDevice) (string, func(), error) {
-	t.Helper() // Mark this function as a helper
+	t.Helper()
 	// Create a temporary directory to simulate /sys/block
 	tempDir, err := os.MkdirTemp("", "block-devices-test")
 	if err != nil {
@@ -40,10 +40,8 @@ func setupMockBlockDevices(t *testing.T, blockDevices []limiter.BlockDevice) (st
 		return "", nil, err
 	}
 
-	// Create the mock block devices
 	CreateMockBlockDevicesHelper(t, tempDir, blockDevices)
 
-	// Return the temp directory and a cleanup function
 	cleanup := func() {
 		os.RemoveAll(tempDir)
 	}
@@ -52,13 +50,10 @@ func setupMockBlockDevices(t *testing.T, blockDevices []limiter.BlockDevice) (st
 }
 
 func TestGetBlockDevices(t *testing.T) {
-	// Define the mock block devices
 	mockDevices := []limiter.BlockDevice{
 		{Name: "sda", Major: 8, Minor: 0},
 		{Name: "sdb", Major: 8, Minor: 16},
 	}
-
-	// Use the helper function to create the mock block devices
 	tempDir, cleanup, err := setupMockBlockDevices(t, mockDevices)
 	if err != nil {
 		t.Fatalf("Failed to set up mock block devices: %v", err)
@@ -87,19 +82,15 @@ func TestGetBlockDevices(t *testing.T) {
 
 // Test unparsable throttle values
 func TestNewIOLimiterUnparsableThrottleValues(t *testing.T) {
-	// Define the mock block devices
 	mockDevices := []limiter.BlockDevice{
 		{Name: "sda", Major: 8, Minor: 0},
 		{Name: "sdb", Major: 8, Minor: 16},
 	}
-
-	// Use the helper function to create the mock block devices
 	tempDir, cleanup, err := setupMockBlockDevices(t, mockDevices)
 	if err != nil {
 		t.Fatalf("Failed to set up mock block devices: %v", err)
 	}
 	defer cleanup()
-	// Define the test cases
 	tests := []struct {
 		readThrottle  string
 		writeThrottle string
@@ -109,7 +100,7 @@ func TestNewIOLimiterUnparsableThrottleValues(t *testing.T) {
 		{"invalid", "1000", "unparsable ReadThrottle value"},
 		{"1000", "invalid", "unparsable WriteThrottle value"},
 	}
-	// Run the test cases
+
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("ReadThrottle=%s,WriteThrottle=%s", tt.readThrottle, tt.writeThrottle), func(t *testing.T) {
 			init := &limiter.IOLimiterInitializer{
@@ -132,19 +123,15 @@ func TestNewIOLimiterUnparsableThrottleValues(t *testing.T) {
 
 // Should not set a throttle value if the throttle value is -1
 func TestNewIOLimiterNoThrottleValues(t *testing.T) {
-	// Define the mock block devices
 	mockDevices := []limiter.BlockDevice{
 		{Name: "sda", Major: 8, Minor: 0},
 		{Name: "sdb", Major: 8, Minor: 16},
 	}
-
-	// Use the helper function to create the mock block devices
 	tempDir, cleanup, err := setupMockBlockDevices(t, mockDevices)
 	if err != nil {
 		t.Fatalf("Failed to set up mock block devices: %v", err)
 	}
 	defer cleanup()
-	// Define the test cases
 	tests := []struct {
 		readThrottle  string
 		writeThrottle string
@@ -152,7 +139,7 @@ func TestNewIOLimiterNoThrottleValues(t *testing.T) {
 		{"-1", "1m"},
 		{"1m", "-1"},
 	}
-	// Run the test cases
+
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("ReadThrottle=%s,WriteThrottle=%s", tt.readThrottle, tt.writeThrottle), func(t *testing.T) {
 			init := &limiter.IOLimiterInitializer{
@@ -176,39 +163,31 @@ func TestNewIOLimiterNoThrottleValues(t *testing.T) {
 
 // Should not set a throttle value if the throttle value is -1 after the application of the limiter
 func TestIOLimiterApplyNoThrottleValues(t *testing.T) {
-	// Define the mock block devices
 	mockDevices := []limiter.BlockDevice{
 		{Name: "sda", Major: 8, Minor: 0},
 		{Name: "sdb", Major: 8, Minor: 16},
 	}
-
-	// Use the helper function to create the mock block devices
 	tempDir, cleanup, err := setupMockBlockDevices(t, mockDevices)
 	if err != nil {
 		t.Fatalf("Failed to set up mock block devices: %v", err)
 	}
 	defer cleanup()
-	// create a new IOLimiterInitializer
 	init := &limiter.IOLimiterInitializer{
 		ReadThrottle:           "-1",
 		WriteThrottle:          "1M",
 		OverrideSystemBlockDir: tempDir,
 	}
-	// create a new IOLimiter
 	limiter, err := limiter.NewIOLimiter(init)
-	// check if there was an error
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// create a new LinuxResources
 	resources := &specs.LinuxResources{}
-	// apply the limiter to the resources
+
 	limiter.Apply(resources)
-	// check if the ThrottleReadBpsDevice is correct
+
 	if len(resources.BlockIO.ThrottleReadBpsDevice) != 0 {
 		t.Fatalf("unexpected number of ThrottleReadBpsDevice: %d", len(resources.BlockIO.ThrottleReadBpsDevice))
 	}
-	// check if the ThrottleWriteBpsDevice is correct
 	if len(resources.BlockIO.ThrottleWriteBpsDevice) != len(mockDevices) {
 		t.Fatalf("unexpected number of ThrottleWriteBpsDevice: %d", len(resources.BlockIO.ThrottleWriteBpsDevice))
 	}
@@ -218,14 +197,13 @@ func TestIOLimiterApplyNoThrottleValues(t *testing.T) {
 func TestNewIOLimiterInvalidSystemBlockDir(t *testing.T) {
 	// Define an invalid system block directory
 	invalidDir := "/nonexistent"
-	// Define the test cases
 	tests := []struct {
 		systemBlockDir string
 		expectedError  string
 	}{
 		{invalidDir, "error retrieving block devices"},
 	}
-	// Run the test cases
+
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("SystemBlockDir=%s", tt.systemBlockDir), func(t *testing.T) {
 			init := &limiter.IOLimiterInitializer{
@@ -248,39 +226,32 @@ func TestNewIOLimiterInvalidSystemBlockDir(t *testing.T) {
 
 // test that the limiter package is able to create a new IOLimiter
 func TestNewIOLimiter(t *testing.T) {
-	// Define the mock block devices
 	mockDevices := []limiter.BlockDevice{
 		{Name: "sda", Major: 8, Minor: 0},
 		{Name: "sdb", Major: 8, Minor: 16},
 	}
 
-	// Use the helper function to create the mock block devices
 	tempDir, cleanup, err := setupMockBlockDevices(t, mockDevices)
 	if err != nil {
 		t.Fatalf("Failed to set up mock block devices: %v", err)
 	}
 	defer cleanup()
-	// create a new IOLimiterInitializer
 	init := &limiter.IOLimiterInitializer{
 		ReadThrottle:           "1M",
 		WriteThrottle:          "1M",
 		OverrideSystemBlockDir: tempDir,
 	}
-	// create a new IOLimiter
 	limiter, err := limiter.NewIOLimiter(init)
-	// check if there was an error
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// check if the ReadThrottle is correct
+
 	if limiter.ReadThrottle != 1024*1024 {
 		t.Fatalf("unexpected ReadThrottle: %d", limiter.ReadThrottle)
 	}
-	// check if the WriteThrottle is correct
 	if limiter.WriteThrottle != 1024*1024 {
 		t.Fatalf("unexpected WriteThrottle: %d", limiter.WriteThrottle)
 	}
-	// check if the BlockDevices is correct
 	if len(limiter.BlockDevices) != len(mockDevices) {
 		t.Fatalf("unexpected number of BlockDevices: %d", len(limiter.BlockDevices))
 	}
@@ -288,43 +259,35 @@ func TestNewIOLimiter(t *testing.T) {
 
 // Test Apply method of IOLimiter
 func TestIOLimiterApply(t *testing.T) {
-	// Define the mock block devices
 	mockDevices := []limiter.BlockDevice{
 		{Name: "sda", Major: 8, Minor: 0},
 		{Name: "sdb", Major: 8, Minor: 16},
 	}
 
-	// Use the helper function to create the mock block devices
 	tempDir, cleanup, err := setupMockBlockDevices(t, mockDevices)
 	if err != nil {
 		t.Fatalf("Failed to set up mock block devices: %v", err)
 	}
 	defer cleanup()
-	// create a new IOLimiterInitializer
 	init := &limiter.IOLimiterInitializer{
 		ReadThrottle:           "1M",
 		WriteThrottle:          "1M",
 		OverrideSystemBlockDir: tempDir,
 	}
-	// create a new IOLimiter
 	limiter, err := limiter.NewIOLimiter(init)
-	// check if there was an error
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// create a new LinuxResources
 	resources := &specs.LinuxResources{}
-	// apply the limiter to the resources
+
 	limiter.Apply(resources)
-	// check if the ThrottleReadBpsDevice is correct
+
 	if len(resources.BlockIO.ThrottleReadBpsDevice) != len(mockDevices) {
 		t.Fatalf("unexpected number of ThrottleReadBpsDevice: %d", len(resources.BlockIO.ThrottleReadBpsDevice))
 	}
-	// check if the ThrottleWriteBpsDevice is correct
 	if len(resources.BlockIO.ThrottleWriteBpsDevice) != len(mockDevices) {
 		t.Fatalf("unexpected number of ThrottleWriteBpsDevice: %d", len(resources.BlockIO.ThrottleWriteBpsDevice))
 	}
-	// Check that the Major and Minor numbers are correct
 	for i, device := range resources.BlockIO.ThrottleReadBpsDevice {
 		expected := mockDevices[i]
 		if device.Major != expected.Major || device.Minor != expected.Minor {
