@@ -144,20 +144,34 @@ If your operations utilize the `O_DIRECT` flag, the RAM limit is not required, a
 
 - **`--network-max-bandwidth=VALUE`**
 
-  Set a maximum network bandwidth limit for the container. Requires `--network-class-id` to be set.
+  Set a maximum egress (outgoing) bandwidth limit for the container. Requires `--network-class-id` to be set.
 
   - **`VALUE`**: Maximum bandwidth using the same notation as memory (`k`, `m`, `g`).
   - **Units**:
     - `k` or `K`: Kilobytes per second
     - `m` or `M`: Megabytes per second
     - `g` or `G`: Gigabytes per second
-  - **Example**: `--network-max-bandwidth=1m` limits network bandwidth to 1 MB/s.
-  - **Use Case**: Enforces hard bandwidth limits on network traffic using Linux traffic control (tc) with HTB qdisc.
+  - **Example**: `--network-max-bandwidth=1m` limits egress bandwidth to 1 MB/s.
+  - **Use Case**: Enforces hard bandwidth limits on outgoing network traffic using Linux traffic control (tc) with HTB qdisc.
+
+- **`--network-max-bandwidth-ingress=VALUE`**
+
+  Set a maximum ingress (incoming) bandwidth limit for the container. Requires `--network-class-id` to be set.
+
+  - **`VALUE`**: Maximum bandwidth using the same notation as memory (`k`, `m`, `g`).
+  - **Units**:
+    - `k` or `K`: Kilobytes per second
+    - `m` or `M`: Megabytes per second
+    - `g` or `G`: Gigabytes per second
+  - **Example**: `--network-max-bandwidth-ingress=1m` limits ingress bandwidth to 1 MB/s.
+  - **Use Case**: Enforces hard bandwidth limits on incoming network traffic using IFB (Intermediate Functional Block) device with tc redirection.
 
 **Note:**  
 Network limitations work with cgroups v2's network controller to provide packet classification and prioritization. The priority setting applies to all network interfaces in the container.
 
-When `--network-max-bandwidth` is specified with `--network-class-id`, giogo automatically configures Linux traffic control (tc) with HTB (Hierarchical Token Bucket) to enforce the bandwidth limit. The tc rules are automatically cleaned up when the process exits.
+When `--network-max-bandwidth` is specified with `--network-class-id`, giogo automatically configures Linux traffic control (tc) with HTB (Hierarchical Token Bucket) to enforce the egress bandwidth limit.
+
+When `--network-max-bandwidth-ingress` is specified, giogo uses the IFB device pattern: **Redirect ingress → IFB → tc rules**. This creates an IFB device, redirects incoming traffic to it, and applies HTB rate limiting on the IFB device. The tc rules and IFB device are automatically cleaned up when the process exits.
 
 ## Examples
 
@@ -199,7 +213,23 @@ sudo giogo --network-class-id=100 --network-priority=50 -- your_network_intensiv
 sudo giogo --network-class-id=100 --network-max-bandwidth=1m -- your_app
 ```
 
-- **Description**: Runs `your_app` with network bandwidth limited to 1 MB/s. This automatically configures traffic control (tc) with HTB qdisc to enforce the limit.
+- **Description**: Runs `your_app` with egress (outgoing) network bandwidth limited to 1 MB/s. This automatically configures traffic control (tc) with HTB qdisc to enforce the limit.
+
+### Network Ingress Bandwidth Limiting
+
+```bash
+sudo giogo --network-class-id=100 --network-max-bandwidth-ingress=500k -- your_app
+```
+
+- **Description**: Runs `your_app` with ingress (incoming) network bandwidth limited to 500 KB/s. This uses IFB device redirection pattern to enforce incoming traffic limits.
+
+### Network Bidirectional Bandwidth Limiting
+
+```bash
+sudo giogo --network-class-id=100 --network-max-bandwidth=1m --network-max-bandwidth-ingress=500k -- your_app
+```
+
+- **Description**: Runs `your_app` with both egress limited to 1 MB/s and ingress limited to 500 KB/s, providing full bidirectional bandwidth control.
 
 ### Combined Resource Limitation
 

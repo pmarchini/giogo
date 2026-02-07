@@ -82,3 +82,97 @@ func GetDefaultInterface() string {
 	
 	return "eth0" // fallback
 }
+
+// setupIngressHTB sets up ingress traffic control using IFB device
+// The pattern is: Redirect ingress → IFB → tc rules
+func setupIngressHTB(interfaceName, ifbDeviceName string, classID uint32, rateBytesPerSec uint64) error {
+	// Convert bytes per second to bits per second for tc
+	rateBitsPerSec := rateBytesPerSec * 8
+	
+	// Format: 1:classID in hex
+	classIDHex := fmt.Sprintf("1:%x", classID)
+	
+	// Step 1: Load IFB module if not already loaded
+	modprobeCmd := exec.Command("modprobe", "ifb")
+	modprobeCmd.CombinedOutput() // Ignore errors - module might already be loaded
+	
+	// Step 2: Create/bring up IFB device
+	// Check if IFB device exists
+	checkCmd := exec.Command("ip", "link", "show", ifbDeviceName)
+	if _, err := checkCmd.CombinedOutput(); err != nil {
+		// IFB device doesn't exist, create it
+		createCmd := exec.Command("ip", "link", "add", "name", ifbDeviceName, "type", "ifb")
+		if output, err := createCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to create IFB device %s: %v, output: %s", ifbDeviceName, err, string(output))
+		}
+	}
+	
+	// Bring up the IFB device
+	upCmd := exec.Command("ip", "link", "set", "dev", ifbDeviceName, "up")
+	if output, err := upCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to bring up IFB device %s: %v, output: %s", ifbDeviceName, err, string(output))
+	}
+	
+	// Step 3: Redirect ingress traffic from main interface to IFB
+	// First, add ingress qdisc on main interface
+	ingressCmd := exec.Command("tc", "qdisc", "add", "dev", interfaceName, "ingress")
+	ingressCmd.CombinedOutput() // Ignore error if already exists
+	
+	// Add filter to redirect ingress to IFB
+	redirectCmd := exec.Command("tc", "filter", "add", "dev", interfaceName, "parent", "ffff:", 
+		"protocol", "ip", "u32", "match", "u32", "0", "0", "flowid", "1:1", "action", "mirred", "egress", "redirect", "dev", ifbDeviceName)
+	if output, err := redirectCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to redirect ingress to IFB: %v, output: %s", err, string(output))
+	}
+	
+	// Step 4: Setup HTB on IFB device (same as egress)
+	// Add root qdisc on IFB
+	ifbQdiscCmd := exec.Command("tc", "qdisc", "add", "dev", ifbDeviceName, "root", "handle", "1:", "htb", "default", "30")
+	if output, err := ifbQdiscCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to add HTB root qdisc on IFB: %v, output: %s", err, string(output))
+	}
+	
+	// Add class with bandwidth limit on IFB
+	rateStr := fmt.Sprintf("%dbit", rateBitsPerSec)
+	ifbClassCmd := exec.Command("tc", "class", "add", "dev", ifbDeviceName, "parent", "1:", "classid", classIDHex, "htb", "rate", rateStr, "ceil", rateStr)
+	if output, err := ifbClassCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to add HTB class on IFB: %v, output: %s", err, string(output))
+	}
+	
+	// Add cgroup filter on IFB
+	handleStr := fmt.Sprintf("%d", classID)
+	ifbFilterCmd := exec.Command("tc", "filter", "add", "dev", ifbDeviceName, "parent", "1:", "protocol", "ip", "prio", "1", "handle", handleStr, "cgroup")
+	if output, err := ifbFilterCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to add cgroup filter on IFB: %v, output: %s", err, string(output))
+	}
+	
+	return nil
+}
+
+// cleanupIngressHTB removes the ingress traffic control setup
+func cleanupIngressHTB(interfaceName, ifbDeviceName string) error {
+	var firstError error
+	
+	// Remove ingress qdisc from main interface
+	ingressDelCmd := exec.Command("tc", "qdisc", "del", "dev", interfaceName, "ingress")
+	if output, err := ingressDelCmd.CombinedOutput(); err != nil {
+		firstError = fmt.Errorf("failed to delete ingress qdisc: %v, output: %s", err, string(output))
+	}
+	
+	// Remove root qdisc from IFB device
+	ifbDelCmd := exec.Command("tc", "qdisc", "del", "dev", ifbDeviceName, "root")
+	if output, err := ifbDelCmd.CombinedOutput(); err != nil && firstError == nil {
+		firstError = fmt.Errorf("failed to delete IFB qdisc: %v, output: %s", err, string(output))
+	}
+	
+	// Bring down and delete IFB device
+	downCmd := exec.Command("ip", "link", "set", "dev", ifbDeviceName, "down")
+	downCmd.CombinedOutput() // Ignore errors
+	
+	delCmd := exec.Command("ip", "link", "del", ifbDeviceName)
+	if output, err := delCmd.CombinedOutput(); err != nil && firstError == nil {
+		firstError = fmt.Errorf("failed to delete IFB device: %v, output: %s", err, string(output))
+	}
+	
+	return firstError
+}

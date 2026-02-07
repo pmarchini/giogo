@@ -35,10 +35,12 @@ var (
 
 // NetworkLimiter applies network resource limits
 type NetworkLimiter struct {
-	ClassID      *uint32
-	Priority     *uint32
-	MaxBandwidth uint64 // Maximum bandwidth in bytes per second (0 means unlimited)
-	interfaceName string // Network interface to apply tc rules to
+	ClassID           *uint32
+	Priority          *uint32
+	MaxBandwidth      uint64 // Maximum egress bandwidth in bytes per second (0 means unlimited)
+	MaxBandwidthIngress uint64 // Maximum ingress bandwidth in bytes per second (0 means unlimited)
+	interfaceName     string // Network interface to apply tc rules to
+	ifbDeviceName     string // IFB device name for ingress shaping
 }
 
 // Apply the network limits to the provided Linux resources
@@ -66,15 +68,18 @@ func (n *NetworkLimiter) Apply(resources *specs.LinuxResources) {
 
 // NetworkLimiterInitializer holds the initialization parameters for NetworkLimiter
 type NetworkLimiterInitializer struct {
-	ClassID      string
-	Priority     string
-	MaxBandwidth string
+	ClassID             string
+	Priority            string
+	MaxBandwidth        string
+	MaxBandwidthIngress string
 }
 
 // NewNetworkLimiter creates a new NetworkLimiter with validation and error handling
 func NewNetworkLimiter(init *NetworkLimiterInitializer) (*NetworkLimiter, error) {
+	iface := GetDefaultInterface()
 	limiter := &NetworkLimiter{
-		interfaceName: GetDefaultInterface(),
+		interfaceName: iface,
+		ifbDeviceName: fmt.Sprintf("ifb-%s", iface), // IFB device for ingress shaping
 	}
 	
 	if init.ClassID != "" {
@@ -98,9 +103,17 @@ func NewNetworkLimiter(init *NetworkLimiterInitializer) (*NetworkLimiter, error)
 	if init.MaxBandwidth != "" {
 		bandwidth, err := parseBandwidth(init.MaxBandwidth)
 		if err != nil {
-			return nil, &NetworkLimiterError{Message: "unparsable bandwidth value", Cause: err}
+			return nil, &NetworkLimiterError{Message: "unparsable egress bandwidth value", Cause: err}
 		}
 		limiter.MaxBandwidth = bandwidth
+	}
+	
+	if init.MaxBandwidthIngress != "" {
+		bandwidth, err := parseBandwidth(init.MaxBandwidthIngress)
+		if err != nil {
+			return nil, &NetworkLimiterError{Message: "unparsable ingress bandwidth value", Cause: err}
+		}
+		limiter.MaxBandwidthIngress = bandwidth
 	}
 	
 	return limiter, nil
@@ -132,26 +145,50 @@ func parseBandwidth(s string) (uint64, error) {
 // Setup implements the LifecycleLimiter interface
 // Sets up traffic control rules for bandwidth limiting
 func (n *NetworkLimiter) Setup() error {
-	// Only setup tc if we have both classID and bandwidth limit
-	if n.ClassID == nil || n.MaxBandwidth == 0 {
-		return nil
-	}
-	
 	// Validate interface name
 	if n.interfaceName == "" {
 		return fmt.Errorf("network interface name not set")
 	}
 	
-	return setupHTB(n.interfaceName, *n.ClassID, n.MaxBandwidth)
+	// Setup egress (outgoing) traffic control if bandwidth limit is set
+	if n.ClassID != nil && n.MaxBandwidth > 0 {
+		if err := setupHTB(n.interfaceName, *n.ClassID, n.MaxBandwidth); err != nil {
+			return err
+		}
+	}
+	
+	// Setup ingress (incoming) traffic control if bandwidth limit is set
+	if n.ClassID != nil && n.MaxBandwidthIngress > 0 {
+		if err := setupIngressHTB(n.interfaceName, n.ifbDeviceName, *n.ClassID, n.MaxBandwidthIngress); err != nil {
+			// Cleanup egress if it was setup
+			if n.MaxBandwidth > 0 {
+				cleanupHTB(n.interfaceName)
+			}
+			return err
+		}
+	}
+	
+	return nil
 }
 
 // Cleanup implements the LifecycleLimiter interface
 // Removes traffic control rules set up by Setup
 func (n *NetworkLimiter) Cleanup() error {
-	// Only cleanup if we have a classID (indicating we set up tc)
-	if n.ClassID == nil || n.MaxBandwidth == 0 {
-		return nil
+	var firstError error
+	
+	// Cleanup egress if it was setup
+	if n.ClassID != nil && n.MaxBandwidth > 0 {
+		if err := cleanupHTB(n.interfaceName); err != nil && firstError == nil {
+			firstError = err
+		}
 	}
 	
-	return cleanupHTB(n.interfaceName)
+	// Cleanup ingress if it was setup
+	if n.ClassID != nil && n.MaxBandwidthIngress > 0 {
+		if err := cleanupIngressHTB(n.interfaceName, n.ifbDeviceName); err != nil && firstError == nil {
+			firstError = err
+		}
+	}
+	
+	return firstError
 }

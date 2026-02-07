@@ -258,3 +258,57 @@ t.Errorf("MaxBandwidth = %v, expected %v", netLimiter.MaxBandwidth, tt.wantMaxBa
 })
 }
 }
+
+func TestNewNetworkLimiterWithIngressBandwidth(t *testing.T) {
+tests := []struct {
+name                    string
+init                    *limiter.NetworkLimiterInitializer
+wantMaxBandwidthIngress uint64
+wantErr                 bool
+}{
+{
+name: "valid ingress bandwidth",
+init: &limiter.NetworkLimiterInitializer{
+ClassID:             "100",
+MaxBandwidthIngress: "1m",
+},
+wantMaxBandwidthIngress: 1024 * 1024,
+wantErr:                 false,
+},
+{
+name: "both egress and ingress",
+init: &limiter.NetworkLimiterInitializer{
+ClassID:             "100",
+MaxBandwidth:        "500k",
+MaxBandwidthIngress: "1m",
+},
+wantMaxBandwidthIngress: 1024 * 1024,
+wantErr:                 false,
+},
+{
+name: "invalid ingress bandwidth",
+init: &limiter.NetworkLimiterInitializer{
+ClassID:             "100",
+MaxBandwidthIngress: "invalid",
+},
+wantErr: true,
+},
+}
+
+for _, tt := range tests {
+t.Run(tt.name, func(t *testing.T) {
+netLimiter, err := limiter.NewNetworkLimiter(tt.init)
+if (err != nil) != tt.wantErr {
+t.Errorf("NewNetworkLimiter() error = %v, wantErr %v", err, tt.wantErr)
+return
+}
+if tt.wantErr {
+return
+}
+
+if netLimiter.MaxBandwidthIngress != tt.wantMaxBandwidthIngress {
+t.Errorf("MaxBandwidthIngress = %v, expected %v", netLimiter.MaxBandwidthIngress, tt.wantMaxBandwidthIngress)
+}
+})
+}
+}
