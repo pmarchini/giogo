@@ -35,9 +35,10 @@ var (
 
 // NetworkLimiter applies network resource limits
 type NetworkLimiter struct {
-	ClassID     *uint32
-	Priority    *uint32
+	ClassID      *uint32
+	Priority     *uint32
 	MaxBandwidth uint64 // Maximum bandwidth in bytes per second (0 means unlimited)
+	interfaceName string // Network interface to apply tc rules to
 }
 
 // Apply the network limits to the provided Linux resources
@@ -72,7 +73,9 @@ type NetworkLimiterInitializer struct {
 
 // NewNetworkLimiter creates a new NetworkLimiter with validation and error handling
 func NewNetworkLimiter(init *NetworkLimiterInitializer) (*NetworkLimiter, error) {
-	limiter := &NetworkLimiter{}
+	limiter := &NetworkLimiter{
+		interfaceName: GetDefaultInterface(),
+	}
 	
 	if init.ClassID != "" {
 		classID, err := strconv.ParseUint(init.ClassID, 10, 32)
@@ -126,23 +129,24 @@ func parseBandwidth(s string) (uint64, error) {
 	return uint64(value * float64(multiplier)), nil
 }
 
-// SetupTrafficControl sets up tc (traffic control) rules for bandwidth limiting
-// This method should be called after the cgroup is created and classID is set
-func (n *NetworkLimiter) SetupTrafficControl(interfaceName string) error {
+// Setup implements the LifecycleLimiter interface
+// Sets up traffic control rules for bandwidth limiting
+func (n *NetworkLimiter) Setup() error {
 	// Only setup tc if we have both classID and bandwidth limit
 	if n.ClassID == nil || n.MaxBandwidth == 0 {
 		return nil
 	}
 	
-	return setupHTB(interfaceName, *n.ClassID, n.MaxBandwidth)
+	return setupHTB(n.interfaceName, *n.ClassID, n.MaxBandwidth)
 }
 
-// CleanupTrafficControl removes tc rules set up by SetupTrafficControl
-func (n *NetworkLimiter) CleanupTrafficControl(interfaceName string) error {
+// Cleanup implements the LifecycleLimiter interface
+// Removes traffic control rules set up by Setup
+func (n *NetworkLimiter) Cleanup() error {
 	// Only cleanup if we have a classID (indicating we set up tc)
 	if n.ClassID == nil || n.MaxBandwidth == 0 {
 		return nil
 	}
 	
-	return cleanupHTB(interfaceName)
+	return cleanupHTB(n.interfaceName)
 }
