@@ -143,7 +143,7 @@ If your operations utilize the `O_DIRECT` flag, the RAM limit is not required, a
   - **Use Case**: Helps prioritize network traffic when multiple processes compete for bandwidth.
 
 **Note:**  
-Network limitations work with cgroups v2's network controller to provide packet classification and prioritization. The priority setting currently applies to the default network interface (eth0).
+Network limitations work with cgroups v2's network controller to provide packet classification and prioritization. The priority setting applies to all network interfaces in the container.
 
 ## Examples
 

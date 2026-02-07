@@ -39,7 +39,9 @@ type NetworkLimiter struct {
 
 // Apply the network limits to the provided Linux resources
 func (n *NetworkLimiter) Apply(resources *specs.LinuxResources) {
-	resources.Network = &specs.LinuxNetwork{}
+	if resources.Network == nil {
+		resources.Network = &specs.LinuxNetwork{}
+	}
 	
 	if n.ClassID != nil {
 		resources.Network.ClassID = n.ClassID
@@ -47,11 +49,11 @@ func (n *NetworkLimiter) Apply(resources *specs.LinuxResources) {
 	
 	if n.Priority != nil {
 		// Note: The spec uses LinuxInterfacePriority which requires an interface name
-		// For simplicity, we'll set a default priority for all interfaces
+		// We use an empty string to apply the priority to all interfaces
 		// This can be extended in the future to support per-interface priorities
 		resources.Network.Priorities = []specs.LinuxInterfacePriority{
 			{
-				Name:     "eth0", // Default interface
+				Name:     "", // Empty string applies to all interfaces
 				Priority: *n.Priority,
 			},
 		}
