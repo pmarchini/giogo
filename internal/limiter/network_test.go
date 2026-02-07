@@ -188,3 +188,73 @@ func TestNetworkLimiterApply(t *testing.T) {
 func uint32Ptr(v uint32) *uint32 {
 	return &v
 }
+
+func TestNewNetworkLimiterWithBandwidth(t *testing.T) {
+tests := []struct {
+name             string
+init             *limiter.NetworkLimiterInitializer
+wantMaxBandwidth uint64
+wantErr          bool
+}{
+{
+name: "valid bandwidth in kilobytes",
+init: &limiter.NetworkLimiterInitializer{
+ClassID:      "100",
+MaxBandwidth: "500k",
+},
+wantMaxBandwidth: 500 * 1024,
+wantErr:          false,
+},
+{
+name: "valid bandwidth in megabytes",
+init: &limiter.NetworkLimiterInitializer{
+ClassID:      "100",
+MaxBandwidth: "1m",
+},
+wantMaxBandwidth: 1024 * 1024,
+wantErr:          false,
+},
+{
+name: "valid bandwidth in gigabytes",
+init: &limiter.NetworkLimiterInitializer{
+ClassID:      "100",
+MaxBandwidth: "2g",
+},
+wantMaxBandwidth: 2 * 1024 * 1024 * 1024,
+wantErr:          false,
+},
+{
+name: "invalid bandwidth",
+init: &limiter.NetworkLimiterInitializer{
+ClassID:      "100",
+MaxBandwidth: "invalid",
+},
+wantErr: true,
+},
+{
+name: "bandwidth without classID should work",
+init: &limiter.NetworkLimiterInitializer{
+MaxBandwidth: "1m",
+},
+wantMaxBandwidth: 1024 * 1024,
+wantErr:          false,
+},
+}
+
+for _, tt := range tests {
+t.Run(tt.name, func(t *testing.T) {
+netLimiter, err := limiter.NewNetworkLimiter(tt.init)
+if (err != nil) != tt.wantErr {
+t.Errorf("NewNetworkLimiter() error = %v, wantErr %v", err, tt.wantErr)
+return
+}
+if tt.wantErr {
+return
+}
+
+if netLimiter.MaxBandwidth != tt.wantMaxBandwidth {
+t.Errorf("MaxBandwidth = %v, expected %v", netLimiter.MaxBandwidth, tt.wantMaxBandwidth)
+}
+})
+}
+}

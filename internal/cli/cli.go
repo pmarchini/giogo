@@ -11,12 +11,13 @@ import (
 )
 
 var (
-	ram              string
-	cpu              string
-	ioReadMax        string
-	ioWriteMax       string
-	networkClassID   string
-	networkPriority  string
+	ram                 string
+	cpu                 string
+	ioReadMax           string
+	ioWriteMax          string
+	networkClassID      string
+	networkPriority     string
+	networkMaxBandwidth string
 )
 
 func SetupRootCommand(rootCmd *cobra.Command) {
@@ -32,6 +33,7 @@ func SetupRootCommand(rootCmd *cobra.Command) {
 	rootCmd.Flags().StringVar(&ioWriteMax, "io-write-max", limiter.UnlimitedIOValue, "IO write max bandwidth (e.g., 128k, 1m)")
 	rootCmd.Flags().StringVar(&networkClassID, "network-class-id", "", "Network class identifier for container's network packets")
 	rootCmd.Flags().StringVar(&networkPriority, "network-priority", "", "Network priority for container's network traffic")
+	rootCmd.Flags().StringVar(&networkMaxBandwidth, "network-max-bandwidth", "", "Maximum network bandwidth (e.g., 1m, 500k) - requires network-class-id")
 }
 
 func Execute() {
@@ -45,7 +47,7 @@ func Execute() {
 }
 
 // TODO: This logic should be moved to a separate package as it's part of the core functionality
-func CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, networkClassID, networkPriority string) ([]limiter.ResourceLimiter, error) {
+func CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, networkClassID, networkPriority, networkMaxBandwidth string) ([]limiter.ResourceLimiter, error) {
 	var limiters []limiter.ResourceLimiter
 
 	if cpu != "" {
@@ -93,10 +95,11 @@ func CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, networkClassID, networkPrio
 		// Known issue: a minimum amount of memory is required to start a process, so if the memory limit is too low, the process will not start.
 	}
 
-	if networkClassID != "" || networkPriority != "" {
+	if networkClassID != "" || networkPriority != "" || networkMaxBandwidth != "" {
 		netInit := limiter.NetworkLimiterInitializer{
-			ClassID:  networkClassID,
-			Priority: networkPriority,
+			ClassID:      networkClassID,
+			Priority:     networkPriority,
+			MaxBandwidth: networkMaxBandwidth,
 		}
 		netLimiter, err := limiter.NewNetworkLimiter(&netInit)
 		if err != nil {
@@ -109,7 +112,7 @@ func CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, networkClassID, networkPrio
 }
 
 func runCommand(cmd *cobra.Command, args []string) error {
-	limiters, err := CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, networkClassID, networkPriority)
+	limiters, err := CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, networkClassID, networkPriority, networkMaxBandwidth)
 	if err != nil {
 		return err
 	}

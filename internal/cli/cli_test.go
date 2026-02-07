@@ -68,7 +68,7 @@ func TestCreateLimiters_IOLimitsAndNoRAM(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	limiters, err := cli.CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, "", "")
+	limiters, err := cli.CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, "", "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestCreateLimiters_IOLimitsAndNoRAM_ReadLimit(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	limiters, err := cli.CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, "", "")
+	limiters, err := cli.CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, "", "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestCreateLimiters_IOLimitsAndRAM(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	limiters, err := cli.CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, "", "")
+	limiters, err := cli.CreateLimiters(cpu, ram, ioReadMax, ioWriteMax, "", "", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
@@ -27,14 +28,16 @@ func (e *NetworkLimiterError) Is(target error) bool {
 
 // Custom errors
 var (
-	ErrUnparsableClassID = &NetworkLimiterError{Message: "unparsable class ID value", Cause: ErrInvalidNetworkValue}
-	ErrUnparsablePriority = &NetworkLimiterError{Message: "unparsable priority value", Cause: ErrInvalidNetworkValue}
+	ErrUnparsableClassID   = &NetworkLimiterError{Message: "unparsable class ID value", Cause: ErrInvalidNetworkValue}
+	ErrUnparsablePriority  = &NetworkLimiterError{Message: "unparsable priority value", Cause: ErrInvalidNetworkValue}
+	ErrUnparsableBandwidth = &NetworkLimiterError{Message: "unparsable bandwidth value", Cause: ErrInvalidNetworkValue}
 )
 
 // NetworkLimiter applies network resource limits
 type NetworkLimiter struct {
-	ClassID  *uint32
-	Priority *uint32
+	ClassID     *uint32
+	Priority    *uint32
+	MaxBandwidth uint64 // Maximum bandwidth in bytes per second (0 means unlimited)
 }
 
 // Apply the network limits to the provided Linux resources
@@ -62,8 +65,9 @@ func (n *NetworkLimiter) Apply(resources *specs.LinuxResources) {
 
 // NetworkLimiterInitializer holds the initialization parameters for NetworkLimiter
 type NetworkLimiterInitializer struct {
-	ClassID  string
-	Priority string
+	ClassID      string
+	Priority     string
+	MaxBandwidth string
 }
 
 // NewNetworkLimiter creates a new NetworkLimiter with validation and error handling
@@ -88,5 +92,57 @@ func NewNetworkLimiter(init *NetworkLimiterInitializer) (*NetworkLimiter, error)
 		limiter.Priority = &priorityValue
 	}
 	
+	if init.MaxBandwidth != "" {
+		bandwidth, err := parseBandwidth(init.MaxBandwidth)
+		if err != nil {
+			return nil, &NetworkLimiterError{Message: "unparsable bandwidth value", Cause: err}
+		}
+		limiter.MaxBandwidth = bandwidth
+	}
+	
 	return limiter, nil
+}
+
+// parseBandwidth parses bandwidth string (e.g., "1m", "500k") to bytes per second
+func parseBandwidth(s string) (uint64, error) {
+	s = strings.TrimSpace(s)
+	var multiplier int64 = 1
+	if strings.HasSuffix(s, "g") || strings.HasSuffix(s, "G") {
+		multiplier = 1024 * 1024 * 1024
+		s = s[:len(s)-1]
+	} else if strings.HasSuffix(s, "m") || strings.HasSuffix(s, "M") {
+		multiplier = 1024 * 1024
+		s = s[:len(s)-1]
+	} else if strings.HasSuffix(s, "k") || strings.HasSuffix(s, "K") {
+		multiplier = 1024
+		s = s[:len(s)-1]
+	} else {
+		multiplier = 1
+	}
+	value, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+	return uint64(value * float64(multiplier)), nil
+}
+
+// SetupTrafficControl sets up tc (traffic control) rules for bandwidth limiting
+// This method should be called after the cgroup is created and classID is set
+func (n *NetworkLimiter) SetupTrafficControl(interfaceName string) error {
+	// Only setup tc if we have both classID and bandwidth limit
+	if n.ClassID == nil || n.MaxBandwidth == 0 {
+		return nil
+	}
+	
+	return setupHTB(interfaceName, *n.ClassID, n.MaxBandwidth)
+}
+
+// CleanupTrafficControl removes tc rules set up by SetupTrafficControl
+func (n *NetworkLimiter) CleanupTrafficControl(interfaceName string) error {
+	// Only cleanup if we have a classID (indicating we set up tc)
+	if n.ClassID == nil || n.MaxBandwidth == 0 {
+		return nil
+	}
+	
+	return cleanupHTB(interfaceName)
 }

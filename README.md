@@ -142,8 +142,22 @@ If your operations utilize the `O_DIRECT` flag, the RAM limit is not required, a
   - **Example**: `--network-priority=50` sets the network traffic priority to 50.
   - **Use Case**: Helps prioritize network traffic when multiple processes compete for bandwidth.
 
+- **`--network-max-bandwidth=VALUE`**
+
+  Set a maximum network bandwidth limit for the container. Requires `--network-class-id` to be set.
+
+  - **`VALUE`**: Maximum bandwidth using the same notation as memory (`k`, `m`, `g`).
+  - **Units**:
+    - `k` or `K`: Kilobytes per second
+    - `m` or `M`: Megabytes per second
+    - `g` or `G`: Gigabytes per second
+  - **Example**: `--network-max-bandwidth=1m` limits network bandwidth to 1 MB/s.
+  - **Use Case**: Enforces hard bandwidth limits on network traffic using Linux traffic control (tc) with HTB qdisc.
+
 **Note:**  
 Network limitations work with cgroups v2's network controller to provide packet classification and prioritization. The priority setting applies to all network interfaces in the container.
+
+When `--network-max-bandwidth` is specified with `--network-class-id`, giogo automatically configures Linux traffic control (tc) with HTB (Hierarchical Token Bucket) to enforce the bandwidth limit. The tc rules are automatically cleaned up when the process exits.
 
 ## Examples
 
@@ -179,10 +193,18 @@ sudo giogo --network-class-id=100 --network-priority=50 -- your_network_intensiv
 
 - **Description**: Runs `your_network_intensive_app` with network class identifier set to 100 and network priority set to 50, allowing for packet classification and traffic prioritization.
 
+### Network Bandwidth Limiting
+
+```bash
+sudo giogo --network-class-id=100 --network-max-bandwidth=1m -- your_app
+```
+
+- **Description**: Runs `your_app` with network bandwidth limited to 1 MB/s. This automatically configures traffic control (tc) with HTB qdisc to enforce the limit.
+
 ### Combined Resource Limitation
 
 ```bash
-sudo giogo --cpu=0.5 --ram=512m --network-class-id=200 --network-priority=75 -- your_app
+sudo giogo --cpu=0.5 --ram=512m --network-class-id=200 --network-max-bandwidth=500k -- your_app
 ```
 
-- **Description**: Runs `your_app` with CPU limited to 50% of one core, RAM limited to 512 MB, network class identifier set to 200, and network priority set to 75.
+- **Description**: Runs `your_app` with CPU limited to 50% of one core, RAM limited to 512 MB, network class identifier set to 200, and network bandwidth limited to 500 KB/s.
