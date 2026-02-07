@@ -55,16 +55,16 @@ func cleanupHTB(interfaceName string) error {
 	cmd := exec.Command("tc", "qdisc", "del", "dev", interfaceName, "root")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		// It's okay if this fails - the qdisc might already be gone
-		// Log it but don't return an error
-		fmt.Printf("Warning: failed to delete HTB qdisc: %v, output: %s\n", err, string(output))
+		// Return the error but don't make it fatal
+		return fmt.Errorf("failed to delete HTB qdisc: %v, output: %s", err, string(output))
 	}
 	return nil
 }
 
-// getDefaultInterface returns the default network interface name
+// GetDefaultInterface returns the default network interface name
 // This is a simple implementation that returns "eth0" as default
 // In production, this could be enhanced to detect the actual default interface
-func getDefaultInterface() string {
+func GetDefaultInterface() string {
 	// Try to find the default route interface
 	cmd := exec.Command("ip", "route", "show", "default")
 	output, err := cmd.CombinedOutput()

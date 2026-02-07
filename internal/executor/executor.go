@@ -2,6 +2,7 @@ package executor
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/pmarchini/giogo/internal/core"
 	"github.com/pmarchini/giogo/internal/limiter"
@@ -39,7 +40,7 @@ func (e *Executor) RunCommand(args []string) error {
 	// Set up traffic control if network limiter with bandwidth is configured
 	if e.NetworkLimiter != nil && e.NetworkLimiter.MaxBandwidth > 0 {
 		// Get default interface - in production this could be configurable
-		iface := getDefaultInterface()
+		iface := limiter.GetDefaultInterface()
 		
 		// Setup tc before running the command
 		if err := e.NetworkLimiter.SetupTrafficControl(iface); err != nil {
@@ -49,7 +50,8 @@ func (e *Executor) RunCommand(args []string) error {
 		// Ensure cleanup happens when we're done
 		defer func() {
 			if err := e.NetworkLimiter.CleanupTrafficControl(iface); err != nil {
-				fmt.Printf("Warning: failed to cleanup traffic control: %v\n", err)
+				// Non-fatal: log the error but don't fail the command
+				fmt.Fprintf(os.Stderr, "Warning: failed to cleanup traffic control: %v\n", err)
 			}
 		}()
 	}
@@ -59,9 +61,4 @@ func (e *Executor) RunCommand(args []string) error {
 		return err
 	}
 	return coreModule.RunCommand(args)
-}
-
-// getDefaultInterface returns the default network interface
-func getDefaultInterface() string {
-	return "eth0" // Simple default - could be enhanced to detect actual default interface
 }
