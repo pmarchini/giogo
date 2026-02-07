@@ -137,6 +137,11 @@ func (n *NetworkLimiter) Setup() error {
 		return nil
 	}
 	
+	// Validate interface name
+	if n.interfaceName == "" {
+		return fmt.Errorf("network interface name not set")
+	}
+	
 	return setupHTB(n.interfaceName, *n.ClassID, n.MaxBandwidth)
 }
 
